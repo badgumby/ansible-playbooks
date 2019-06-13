@@ -1,0 +1,41 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Install EPEL repo
+  raw: yum -y install epel-release
+
+- name: Update yum repos
+  raw: yum update -y
+
+- name: Install base packages
+  yum:
+    name: ['zip', 'unzip', 'wget', 'ntpdate', 'ntp', 'htop', 'screen', 'vim', 'open-vm-tools']
+  tags:
+    - packages
+
+- name: Enable open-vm-tools service (vmtoolsd)
+  systemd:
+    name: vmtoolsd
+    enabled: yes
+
+- name: Restart open-vm-tools service (vmtoolsd)
+  systemd:
+    name: vmtoolsd
+    state: restarted
+
+- name: Enable NTP service (ntpd)
+  systemd:
+    name: ntpd
+    enabled: yes
+
+- name: Set NTP date
+  raw: ntpdate {{ ntp_server }}
+
+- name: Restart NTP service (ntpd)
+  systemd:
+    name: ntpd
+    state: restarted
+
+
+#- debug: msg="Testing lookup {{ snmp_loc }}"

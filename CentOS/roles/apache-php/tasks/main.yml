@@ -1,0 +1,26 @@
+---
+- name: Install Apache + PHP packages
+  yum:
+    name: ['httpd', 'php', 'php-common', 'php-fpm']
+  tags:
+    - packages
+    lock_timeout: 180
+
+- name: Enable Apache service (httpd)
+  systemd:
+    name: httpd
+    enabled: yes
+
+- name: Allow Apache HTTP port (80)
+  raw: firewall-cmd --permanent --zone=public --add-service=http
+
+- name: Allow Apache HTTPS port (443)
+  raw: firewall-cmd --permanent --zone=public --add-service=https
+
+- name: Reload firewall
+  raw: firewall-cmd --reload
+
+- name: Restart Apache service (httpd)
+  systemd:
+    name: httpd
+    state: restarted

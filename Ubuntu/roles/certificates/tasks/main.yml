@@ -1,0 +1,30 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Create '/certs' directory
+  file:
+    path: /certs
+    state: directory
+
+- name: Upload certificates to system
+  copy: src={{ item.src }} dest={{ item.dest }}
+  with_items:
+    - { src: 'Cert1.cer', dest: '/certs/Cert1.cer' }
+    - { src: 'Cert2.cer', dest: '/certs/Cert2.cer' }
+
+- name: Create '/etc/pki/nssdb' directory
+  file:
+    path: /etc/pki/nssdb
+    state: directory
+
+- name: Initialize database
+  command: certutil -N -d sql:/etc/pki/nssdb --empty-password
+  args:
+    creates: /etc/pki/nssdb/cert9.db
+
+- name: Install certificates into database
+  command: "{{ item }}"
+  with_items:
+    - 'certutil -d sql:/etc/pki/nssdb -A -t TC -n "Cert 1" -i /certs/Cert1.cer'
+    - 'certutil -d sql:/etc/pki/nssdb -A -t TC -n "Cert 2" -i /certs/Cert2.cer'

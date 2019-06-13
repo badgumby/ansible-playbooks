@@ -1,0 +1,68 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install upgrade all packages
+  apt:
+    upgrade: full
+
+- name: Install base packages
+  apt:
+    name: ['zip', 'unzip', 'wget', 'ntpdate', 'ntp', 'htop', 'screen', 'vim', 'open-vm-tools', 'firewalld', 'libnss3-tools']
+    update_cache: yes
+
+- name: Remove 'ufw' package
+  apt:
+    name: ufw
+    state: absent
+
+- name: Enable open-vm-tools service (open-vm-tools)
+  service: name=open-vm-tools enabled=yes
+
+- name: Restart open-vm-tools
+  service: name=open-vm-tools state=restarted
+
+- name: Enable firewalld service (firewalld)
+  service: name=firewalld enabled=yes
+
+- name: Restart firewalld
+  service: name=firewalld state=restarted
+
+- name: Set the global timezone to {{ timezone }}
+  command: timedatectl set-timezone {{ timezone }}
+
+- name: Enable NTP service (ntp)
+  service: name=ntp enabled=yes
+
+- name: Restart NTP service (ntp)
+  service: name=ntp state=stopped
+
+- name: Set NTP date
+  raw: sudo ntpdate {{ ntp_server }}
+
+- name: Restart NTP service (ntp)
+  service: name=ntp state=started
+
+- name: Remove unwanted motd files
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/update-motd.d/10-help-text
+    - /etc/update-motd.d/80-livepatch
+    - /etc/update-motd.d/50-motd-news
+
+- name: Copy custom motd files
+  copy: src={{ item.src }} dest={{ item.dest }}
+  with_items:
+    - { src: '99-message', dest: '/etc/update-motd.d/99-message' }
+    - { src: '99-services', dest: '/etc/update-motd.d/99-services' }
+
+- name: Change motd permissions
+  raw: sudo chmod +x /etc/update-motd.d/*
+
+#- debug: msg="Testing lookup {{ snmp_loc }}"

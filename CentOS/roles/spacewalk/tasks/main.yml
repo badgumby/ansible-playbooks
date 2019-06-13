@@ -1,0 +1,73 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Install spacewalk client repo
+  raw: rpm -Uvh https://copr-be.cloud.fedoraproject.org/results/%40spacewalkproject/spacewalk-2.8-client/epel-7-x86_64/00742644-spacewalk-repo/spacewalk-client-repo-2.8-11.el7.centos.noarch.rpm
+
+- name: Install spacewalk client packages
+  yum:
+    name: ['rhn-client-tools', 'rhn-check', 'rhn-setup', 'rhnsd', 'm2crypto', 'yum-rhn-plugin', 'rhncfg-actions']
+  tags:
+    - packages
+
+- name: Download spacewalk client from local server
+  raw: curl --insecure -o /root/rhn-org-trusted-ssl-cert-1.0-4.noarch.rpm https://{{ spacewalk_server }}/pub/rhn-org-trusted-ssl-cert-1.0-4.noarch.rpm
+
+- name: Install locally downloaded spacewalk client
+  raw: rpm -Uvh /root/rhn-org-trusted-ssl-cert-1.0-4.noarch.rpm
+
+- name: Register client with local server
+  raw: rhnreg_ks --serverUrl=https://{{ spacewalk_server }}/XMLRPC --sslCACert=/usr/share/rhn/RHN-ORG-TRUSTED-SSL-CERT --activationkey={{ spacewalk_activation_key }}
+
+- name: Enable RHN actions control
+  raw: rhn-actions-control --enable-all
+
+- name: Change check-in time from 4 hours to 60 minutes
+  lineinfile:
+    path: /etc/sysconfig/rhn/rhnsd
+    regexp: '^INTERVAL=(.*)$'
+    line: INTERVAL=60
+
+- name: Add rhn_check to /etc/crontab
+  lineinfile:
+    path: /etc/crontab
+    line: "*/15 * * * * root rhn_check"
+
+- name: Allow Spacewalk 69/UDP port
+  raw: firewall-cmd --add-port=69/udp --permanent
+
+- name: Allow Spacewalk 5222/UDP port
+  raw: firewall-cmd --add-port=5222/udp --permanent
+
+- name: Allow Spacewalk 5269/UDP port
+  raw: firewall-cmd --add-port=5269/udp --permanent
+
+- name: Reload firewall
+  raw: firewall-cmd --reload
+
+- name: Restart Spacewalk service (rhnsd)
+  systemd:
+    name: rhnsd
+    state: restarted
+
+- name: Install OSAD package
+  yum:
+    name: ['osad']
+  tags:
+    - packages
+
+- name: Configure OSAD
+  lineinfile:
+    path: /etc/sysconfig/rhn/osad.conf
+    line: osa_ssl_cert = /usr/share/rhn/RHN-ORG-TRUSTED-SSL-CERT
+
+- name: Enable OSAD service
+  systemd:
+    name: osad
+    enabled: yes
+
+- name: Restart OSAD service
+  systemd:
+    name: osad
+    state: restarted

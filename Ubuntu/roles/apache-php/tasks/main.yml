@@ -1,0 +1,19 @@
+---
+- name: Install Apache + PHP packages
+  yum:
+    name: ['apache2', 'php', 'php-common', 'php-fpm']
+
+- name: Enable Apache service (apache2)
+  service: name=apache2 enabled=yes
+
+- name: Allow Apache HTTP port (80)
+  raw: sudo firewall-cmd --permanent --zone=public --add-service=http
+
+- name: Allow Apache HTTPS port (443)
+  raw: sudo firewall-cmd --permanent --zone=public --add-service=https
+
+- name: Reload firewall
+  raw: sudo firewall-cmd --reload
+
+- name: Restart Apache service (apache2)
+  service: name=apache2 state=restarted

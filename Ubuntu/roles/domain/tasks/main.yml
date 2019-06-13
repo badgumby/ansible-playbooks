@@ -1,0 +1,101 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Install interactive domain packages (without interaction)
+  raw: sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install libnss-ldap krb5-user
+
+- name: Install remaining domain packages
+  apt:
+    name: ['sssd', 'realmd', 'samba-common', 'libpam-ldap', 'ldap-utils', 'policycoreutils-python-utils', 'sssd-tools', 'libnss-sss', 'libpam-sss', 'adcli', 'packagekit' ]
+
+- name: Write kerberos password for LDAP to file
+  lineinfile:
+    path: /etc/ldap.secret
+    regexp: '.*'
+    line: "{{ krb_password }}"
+    create: yes
+
+- name: Upload ldap.conf to system
+  copy: src=ldap.conf dest=/etc/ldap.conf
+
+- name: Join domain
+  raw: echo {{ password }} | sudo realm join --user={{ username }} {{ domain_to_join }}
+
+- name: Set use_fully_qualified_names to False
+  lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: '^use_fully_qualified_names(.*)$'
+    line: use_fully_qualified_names = False
+
+- name: Set fallback_homedir
+  lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: '^fallback_homedir(.*)$'
+    line: "fallback_homedir = /home/%u"
+
+- name: Turn off credential caching
+  lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: '^cache_credentials(.*)$'
+    line: cache_credentials = False
+
+- name: Add sss_cache purge to crontab
+  lineinfile:
+    path: /var/spool/cron/crontabs/root
+    line: "*/15 * * * * sss_cache -E >/dev/null 2>&1"
+    create: yes
+
+- name: Add server group to sudoers
+  lineinfile:
+    path: /etc/sudoers.d/domaingroups
+    line: "%{{ admin_group }} ALL=(ALL) ALL"
+    create: yes
+
+- name: Add domain admins to sudoers
+  lineinfile:
+    path: /etc/sudoers.d/domaingroups
+    line: "%domain\\\ admins ALL=(ALL) ALL"
+
+- name: Add domain admins and ssh group to sshd_config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "AllowGroups domain?admins wheel {{ ssh_group }}"
+
+# Set idle checkin to 10 minutes, with disconnect after 3 ignored responses (30 minute idle timeout)
+- name: Configure 10 minute idle check-in
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "ClientAliveInterval 600"
+
+- name: Configure 3 check-ins
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "ClientAliveCountMax 3"
+
+- name: Create '/scripts' directory
+  file:
+    path: /scripts
+    state: directory
+
+- name: Create '/scripts/log' file
+  file:
+    path: /scripts/log
+    state: touch
+
+- name: Upload sssd_check.sh to system (ensures SSSd stays online)
+  copy: src=sssd_check.sh dest=/scripts/sssd_check
+
+- name: Verify sssd_check.sh is setup as cron job
+  lineinfile:
+    path: /var/spool/cron/crontabs/root
+    line: "*/5 * * * * /scripts/sssd_check.sh"
+
+- name: Re-dump cron jobs and checkin to crontab
+  raw: "touch /scripts/tmp.txt && crontab -l > /scripts/tmp.txt && crontab /scripts/tmp.txt && rm /scripts/tmp.txt"
+
+- name: Restart SSH service (sshd)
+  service: name=sshd state=restarted
+
+- name: Restart System Security Services service (sssd)
+  service: name=sssd state=restarted

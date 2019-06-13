@@ -1,0 +1,18 @@
+---
+# Host details
+ntp_server: ntp.domain.com
+timezone: America/Chicago
+
+# SNMP config
+snmp_loc: Some City
+snmp_contact: Some Guy
+snmp_rostring: public
+snmp_allowed_host: 127.0.0.1
+
+# Domain join details (AD groups in all lowercase)
+domain_to_join: domain.com
+krb_password: kerberos_password_here
+username: domain_user_here
+password: password_here
+ssh_group: ad_group_for_ssh_all_lowercase
+admin_group: ad_group_for_sudoers_all_lowercase

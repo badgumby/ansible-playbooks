@@ -1,0 +1,82 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Install domain packages
+  yum:
+    name: ['sssd', 'realmd', 'oddjob', 'oddjob-mkhomedir', 'adcli', 'samba-common', 'samba-common-tools', 'krb5-workstation', 'openldap-clients', 'policycoreutils-python']
+  tags:
+    - packages
+    lock_timeout: 180
+
+- name: Restart dbus service (dbus)
+  systemd:
+    name: dbus
+    state: restarted
+
+- name: Join domain
+  raw: echo {{ password }} | realm join --user={{ username }} {{ domain_to_join }}
+
+- name: Set use_fully_qualified_names to False
+  lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: '^use_fully_qualified_names(.*)$'
+    line: use_fully_qualified_names = False
+
+- name: Set fallback_homedir
+  lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: '^fallback_homedir(.*)$'
+    line: "fallback_homedir = /home/%u"
+
+- name: Turn off credential caching
+  lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: '^cache_credentials(.*)$'
+    line: cache_credentials = False
+
+- name: Add sss_cache purge to crontab
+  lineinfile:
+    path: /etc/crontab
+    line: "*/15 * * * * sss_cache -E >/dev/null 2>&1"
+
+- name: Add server group to sudoers
+  lineinfile:
+    path: /etc/sudoers.d/domaingroups
+    line: "%{{ admin_group }} ALL=(ALL) ALL"
+    create: yes
+
+- name: Add domain admins to sudoers
+  lineinfile:
+    path: /etc/sudoers.d/domaingroups
+    line: "%domain\\\ admins ALL=(ALL) ALL"
+
+- name: Add domain admins and ssh group to sshd_config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "AllowGroups domain?admins wheel {{ ssh_group }}"
+
+# Set idle checkin to 10 minutes, with disconnect after 3 ignored responses (30 minute idle timeout)
+- name: Configure 10 minute idle check-in
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "ClientAliveInterval 600"
+
+- name: Configure 3 check-ins
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "ClientAliveCountMax 3"
+
+- name: Restart ssh service (sshd)
+  systemd:
+    name: sshd
+    state: restarted
+
+- name: Restart sss service (sssd)
+  systemd:
+    name: sssd
+    state: restarted
+
+- name: Reboot system to correct dbus issues (caused by the earlier restart)
+  reboot:
+    reboot_timeout: 90

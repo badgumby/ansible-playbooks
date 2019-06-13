@@ -1,0 +1,16 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Ensure 'sshaccess' group exists
+  group:
+    name: sshaccess
+    state: present
+
+- name: Add 'sshaccess' and 'wheel' groups to 'AllowGroups' in /etc/ssh/sshd_config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: AllowGroups wheel sshaccess
+
+- name: Restart SSH service (sshd)
+  service: name=sshd state=restarted

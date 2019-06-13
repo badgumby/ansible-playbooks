@@ -1,0 +1,58 @@
+---
+- name: Include vars.yml
+  include_vars: ../../vars/vars.yml
+
+- name: Install snmp packages
+  yum:
+    name: ['net-snmp', 'net-snmp-utils']
+  tags:
+    - packages
+
+- name: Allow SNMP TCP ports
+  raw: firewall-cmd --zone=public --add-port=161-162/tcp --permanent
+
+- name: Allow SNMP UDP ports
+  raw: firewall-cmd --zone=public --add-port=161-162/udp --permanent
+
+- name: Reload firewall for changes
+  raw: firewall-cmd --reload
+
+#- name: SNMP config (check if location is already set)
+#  shell: grep "^syslocation " /etc/snmp/snmpd.conf
+#  register: test_loc
+
+- name: SNMP config (Set location)
+  lineinfile:
+    path: /etc/snmp/snmpd.conf
+    line: syslocation {{ snmp_loc }}
+#  when: test_loc.stdout != ""
+
+- name: SNMP config (Set contact)
+  lineinfile:
+    path: /etc/snmp/snmpd.conf
+    line: syscontact {{ snmp_contact }}
+
+- name: SNMP config (Set services)
+  lineinfile:
+    path: /etc/snmp/snmpd.conf
+    line: sysservices 76
+
+- name: SNMP config (Set community string)
+  lineinfile:
+    path: /etc/snmp/snmpd.conf
+    line: rocommunity {{ snmp_rostring }} {{ snmp_allowed_host }}
+
+- name: SNMP config (Set monitored disk)
+  lineinfile:
+    path: /etc/snmp/snmpd.conf
+    line: disk /
+
+- name: Enable snmpd service
+  systemd:
+    name: snmpd
+    enabled: yes
+
+- name: Restart snmpd service
+  systemd:
+    name: snmpd
+    state: restarted

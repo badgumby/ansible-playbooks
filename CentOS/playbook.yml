@@ -1,0 +1,24 @@
+---
+- name: Base CentOS setup
+  hosts: all
+  become: yes
+
+  gather_facts: false
+  pre_tasks:
+    - name: Install python for Ansible
+      raw: test -e /usr/bin/python || (yum -y update && yum install -y python-minimal)
+      changed_when: False
+    - setup: # aka gather_facts
+
+  roles:
+  # All CentOS installs should get 'base', 'certificates', 'snmp', and 'spacewalk'
+  - base
+  - certificates
+  - snmp
+  - spacewalk
+  # Uncomment below if Apache/PHP should be installed
+  #- apache-php
+  # Uncomment below if this machine should be joined to the domain
+  #- non-domain-server
+  # Uncomment below if this machine should be joined to the domain
+  #- domain
