@@ -1,0 +1,16 @@
+---
+- name: Upload 01-netcfg.yaml to system
+  copy: src=01-netcfg.yaml dest=/etc/netplan/01-netcfg.yaml
+
+- name: Check if 01-netcfg.yaml exists
+  stat:
+    path: /etc/netplan/01-netcfg.yaml
+  register: netcfg_exists
+
+- name: Remove cloud config from netplan
+  file:
+    path: /etc/netplan/50-cloud-init.yaml
+    state: absent
+    #when: netcfg_exists.stat.exists == true
+- name: Reboot for changes
+  command: reboot
